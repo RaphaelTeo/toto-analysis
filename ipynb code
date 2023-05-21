@@ -1,0 +1,125 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df = pd.read_csv('ToTo.csv')
+df2014 = df[df['Draw'] >= 2995]
+df2014.tail(10)
+
+# Get every set of winning numbers
+row_list_2014 = []
+for index, rows in df2014.iterrows():
+    row_list_2014.append([rows['Winning Number 1'], rows['2'], rows['3'], rows['4'], rows['5'], rows['6'], rows['Additional Number ']])
+print(row_list_2014)
+
+# Prepare blank matrix for number correlation
+matrix2014 = pd.DataFrame(data = [[0 for j in range(1,50)] for i in range(1,50)], index = [i for i in range(1,50)], columns = [i for i in range(1,50)])
+matrix2014
+
+# Fill up matrix
+for eachrow in row_list_2014:
+    for eachno in eachrow:
+        for othernos in eachrow:
+            matrix2014[othernos][eachno] += 1 # matrix[column][row]
+print(matrix2014)
+
+# Compile the frequencies of the numbers into a list, replace them in the matrix as zeros (so as not to skew the heatmap)
+freqlist2014 = []
+for i in range (1,50):
+    a = matrix2014[i][i]
+    freqlist2014.append(a)
+    matrix2014[i][i] = 0 #pd.NA
+print(freqlist2014)
+
+plt.figure(figsize=(30,30))
+sns.set(rc={'axes.facecolor':'white'})
+corrmap2014 = sns.heatmap(matrix2014, cmap="YlGnBu", annot=True, cbar=False)
+corrmap2014.set_title('Correlation Heatmap: from 9/10/2014 to 2/1/2023 (837 draws)')
+corrmap2014.xaxis.set_ticks_position("top") # set x axis ticks to the top
+corrmap2014.set_yticklabels(corrmap2014.get_yticklabels(), rotation = 0) # make sure y axis ticks are upright
+corrmap2014
+
+corrmap2014.get_figure().savefig('corrmap2014 02012023.png', bbox_inches='tight', dpi=300) # export figure
+
+# Frequency analysis
+df_freq2014 = pd.DataFrame(data=freqlist2014, index = [i for i in range(1,50)], columns=['frequency'])
+
+freqplot2014 = df_freq2014.plot.bar(figsize=(50,30))
+freqplot2014.xaxis.tick_top()
+freqplot2014
+freqplot2014.get_figure().savefig('freqchart2014.png', bbox_inches='tight', dpi=300) # export figure
+
+# Sums of every draw analysis
+
+# List of sums for all draws
+drawsums2014 = []
+for eachrow in row_list_2014:
+    drawsums2014.append(sum([i for i in eachrow]))
+print(drawsums2014)
+
+# List of dates for all draws
+dates_list2014 = []
+for index, rows in df2014.iterrows():
+    dates_list2014.append(rows['Date'])
+print(dates_list2014)
+
+mean2014 = 0
+for i in drawsums2014:
+    mean2014 += i
+mean2014 = mean2014/len(drawsums2014)
+print(mean2014)
+
+plt.figure(figsize=(60,30))
+sumschart2014 = sns.scatterplot(x=dates_list2014, y=drawsums2014)
+sumschart2014.set_xticklabels(dates_list2014, size = 3, rotation=90)
+sumschart2014.set_title(f'Draw sums: from 9/10/2014 to 2/1/2023. Grand mean sum: {mean2014}')
+sumschart2014
+sumschart2014.get_figure().savefig('sumschart2014 02012023.png', bbox_inches='tight', dpi=450) # export figure
+
+# Sets analysis (only for sets of 6. Will be more onerous for more number picks)
+# Sets with highest frequency sum: highest occurrences theory
+
+no_of_other_numbers = 5 # only 6 numbers per set will be considered
+lucky_df = pd.DataFrame(columns=['set','freq_sum']) # initialise
+
+for i in range (1,50):
+    freq_sum = df_freq2014.loc[i]['frequency'] # freq of this number
+    other_numbers = matrix2014.loc[[i]] # get the row across the matrix
+
+    set = other_numbers.transpose().sort_values(by=i, ascending=False).head(no_of_other_numbers) # get only the top numbers
+
+    best_numbers = [i]
+    best_numbers.extend(set.index.tolist())
+
+    freq_sum += set[i].sum() # calculate sum
+
+    new_row = pd.Series({'set': best_numbers,'freq_sum': freq_sum})
+    lucky_df = pd.concat([lucky_df, new_row.to_frame().T], ignore_index=True)
+    
+lucky_df
+
+lucky_df.sort_values(by='freq_sum', ascending=False).head(10)
+
+# Sets analysis (only for sets of 6. Will be more onerous for more number picks)
+# Sets with lowest frequency sum: mean reversion theory
+# Need to remove the first number itself from the count
+
+no_of_other_numbers = 5 # only 6 numbers per set will be considered
+lucky_df = pd.DataFrame(columns=['set','freq_sum']) # initialise
+
+for i in range (1,50):
+    freq_sum = df_freq2014.loc[i]['frequency']
+    other_numbers = matrix2014.loc[[i]].drop(i, axis=1) # get the row across the matrix, minus the starting value
+
+    set = other_numbers.transpose().sort_values(by=i, ascending=True).head(no_of_other_numbers) # get only the lowest numbers
+
+    best_numbers = [i]
+    best_numbers.extend(set.index.tolist())
+
+    freq_sum += set[i].sum() # calculate sum
+
+    new_row = pd.Series({'set': best_numbers,'freq_sum': freq_sum})
+    lucky_df = pd.concat([lucky_df, new_row.to_frame().T], ignore_index=True)
+    
+lucky_df
+lucky_df.sort_values(by='freq_sum', ascending=True).tail(10)
